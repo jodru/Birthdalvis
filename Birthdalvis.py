@@ -21,7 +21,7 @@ import math
 conn = sqlite3.connect('data.db', check_same_thread = False)
 
 def makeDatabase():
-    #Init database, enable = 0 logs are disabled, enable = 1 logs are enabled (this comment is old)
+    #Init database, enable = 0 logs are disabled, enable = 1 logs are enabled
     c = conn.cursor()
     try: 
         c.execute("""CREATE TABLE RegisteredGuilds (
@@ -99,36 +99,42 @@ class BirthComs(commands.Cog):
         
         
     @commands.command()
-    async def addBirthday(self, ctx, *, userID, month, day):
+    async def addBirthday(self, ctx, user: discord.User, monthstr, daystr):
         """Add a user with the id provided."""
         #set user bday
         guildID = str(ctx.guild.id)
-        
-        if isinstance(month, int) or isinstance(day, int):
+        month = int(monthstr)
+        day = int(daystr)
+        userID = user.id
+        print(userID)
+        if isinstance(month, int) and isinstance(day, int):
             c = conn.cursor()
             try:
-                c.execute(f"INSERT INTO \"{guildID}\" (\"{userID}\",\"{month}\",\"{day}\")")
+                c.execute(f"INSERT INTO \"{guildID}\" (nameID, birthmonth, birthday) VALUES (\"{userID}\",\"{month}\",\"{day}\")")
                 conn.commit()
                 await ctx.send(f"User added with birthday {month}/{day}")
             except:
                 await ctx.send("Error. The user may have already been added, try running !updateBirthday.")
             c.close()
         else:
+            print(type(month))
             await ctx.send("Error. Did you tag a user and then follow with the month and day?")
         
     
     @commands.command()
-    async def updateBirthday(self, ctx, *, user: discord.User, month, day):
+    async def updateBirthday(self, ctx, user: discord.User, monthstr, daystr):
         """Enable deleted message logging"""
         #update user bday if it exists
         guildID = str(ctx.guild.id)
+        month = int(monthstr)
+        day = int(daystr)
         userID = user.id
         if isinstance(month, int) or isinstance(day, int):
             c = conn.cursor()
             try:
-                c.execute(f"UPDATE {guildID} SET birthmonth = {month} WHERE nameID = {userID}")
+                c.execute(f"UPDATE \"{guildID}\" SET birthmonth = \"{month}\" WHERE nameID = \"{userID}\"")
                 conn.commit()
-                c.execute(f"UPDATE {guildID} SET birthday = {month} WHERE nameID = {userID}")
+                c.execute(f"UPDATE \"{guildID}\" SET birthday = \"{day}\" WHERE nameID = \"{userID}\"")
                 conn.commit()
                 await ctx.send(f"User updated with birthday {month}/{day}")
             except:
@@ -140,12 +146,14 @@ class BirthComs(commands.Cog):
         c.close()
             
     @commands.command()
-    async def removeUser(self, ctx, *, userID):
+    async def removeUser(self, ctx, *, userIDstr):
         """Remove user from database."""
         guildID = str(ctx.guild.id)
         c = conn.cursor()
+        userID = int(userIDstr)
         try:
-            c.execute(f"DELETE FROM {guildID} WHERE nameID = {userID}")
+            c.execute(f"DELETE FROM \"{guildID}\" WHERE nameID = \"{userID}\"")
+            await ctx.send("User removed.")
         except:
             await ctx.send("User not found.")
         
@@ -153,7 +161,7 @@ TOKEN = ""
 
 description = '''Testing ground for birthdalvis'''
 intents = discord.Intents.all()
-bot = commands.Bot(command_prefix='!', activity = discord.Game(name="v0.1 - first run"), description=description, intents= intents)
+bot = commands.Bot(command_prefix='!', activity = discord.Game(name="v0.2 - syntax updates"), description=description, intents= intents)
 
 @bot.event
 async def on_ready():
