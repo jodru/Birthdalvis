@@ -7,16 +7,19 @@ Happy birthday
 '''
 
 import discord
+import datetime
+from datetime import date
 from requests import get
-from discord.ui import Button, Select, View
 from discord.ext import commands, tasks
 import asyncio
 import logging
-from collections import deque, defaultdict
 from dotenv import load_dotenv
 import os
 import sqlite3
 import math
+
+utc = datetime.timezone.utc
+time = datetime.time(hour=7, minute=0, tzinfo=utc)
 
 conn = sqlite3.connect('data.db', check_same_thread = False)
 
@@ -42,17 +45,6 @@ logger.setLevel(logging.DEBUG)
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
 handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
 logger.addHandler(handler)
-
-# The only point in this is I don't feel like removing it rn
-class RegComs(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
-        self._last_member = None
-
-    @commands.command()
-    async def hellothere(self, ctx):
-        """This is about all the "hello world" you old farts are gonna get."""
-        await ctx.send("General Kenobi!")
 
 #every birthday command you'll ever need
 class BirthComs(commands.Cog):
@@ -154,30 +146,73 @@ class BirthComs(commands.Cog):
         try:
             c.execute(f"DELETE FROM \"{guildID}\" WHERE nameID = \"{userID}\"")
             await ctx.send("User removed.")
+            
         except:
             await ctx.send("User not found.")
+        c.close()
+            
+    @tasks.loop(time=time)
+    async def my_task(self):
+        c = conn.cursor()
+        run1 = 0
+        while run1 != 1:
+            try:
+                regGuilds = [registered[0] for registered in c.execute("SELECT guildID FROM RegisteredGuilds")]
+                
+                print (regGuilds)
+                print (type(regGuilds))
+                
+                for x in regGuilds:
+                    '''iterate through value 0-max
+                    if month = current month and day = current day
+                        post happy birthday message in regGuilds guildID channel'''        
+                    c.execute(f"SELECT * from \"{regGuilds[x]}\"")
+                    records = c.fetchall()
+                    print(type(records))
+                    print(records)
+                    for row in records:
+                        if row[1] == datetime.date.month and row[2] == datetime.date.day:
+                            print(f" {row[0]} gay")
+                        else:
+                            print(f" {row[0]} not gay")
+            except:
+                run1 = 1
+                print()
+        
+
         
 TOKEN = ""
 
 description = '''Testing ground for birthdalvis'''
 intents = discord.Intents.all()
-bot = commands.Bot(command_prefix='!', activity = discord.Game(name="v0.2 - syntax updates"), description=description, intents= intents)
+bot = commands.Bot(command_prefix='!', activity = discord.Game(name="v0.3 - daily checks"), description=description, intents= intents)
 
 @bot.event
 async def on_ready():
     makeDatabase()
+    
+    c = conn.cursor()
+    c.execute(f"SELECT * from \"{insertguildidthisisfortestinganyways}\"")
+    records = c.fetchall()
+    print(type(records))
+    print(records)
+    today = date.today()
+    for row in records:
+        if row[1] == today.month and row[2] == today.day:
+            print(f" {row[0]} togay")
+        else:
+            print(f" {row[0]} not today")
+            
+                            
     print('Logged in as')
     print(bot.user.name)
     print(bot.user.id)
     print('------')
 
 
-
 async def main():
     async with bot:
-        await bot.add_cog(BirthComs(bot))
-        await bot.add_cog(RegComs(bot)) 
-        
+        await bot.add_cog(BirthComs(bot))     
         await bot.start(TOKEN)
 
 asyncio.run(main())
