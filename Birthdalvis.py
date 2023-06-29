@@ -19,7 +19,7 @@ import sqlite3
 import math
 
 utc = datetime.timezone.utc
-time = datetime.time(hour=7, minute=0, tzinfo=utc)
+time = datetime.time(hour=7, minute=0, second=0, tzinfo=utc)
 
 conn = sqlite3.connect('data.db', check_same_thread = False)
 
@@ -34,7 +34,7 @@ def makeDatabase():
         conn.commit()
         print("dbmade")
     except:
-        print("dbalreadyexist");
+        print("dbexist");
     c.close()
 
 load_dotenv()
@@ -50,8 +50,7 @@ logger.addHandler(handler)
 class BirthComs(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self._last_member = None
-
+        self.my_task.start()
     
     @commands.command()
     async def register(self, ctx):
@@ -60,6 +59,7 @@ class BirthComs(commands.Cog):
         #check to see if table with guildID as name already exists
         #if so then return guild already exists
         #if not make the table
+        #should be no reason to deregister a guild
         
         guildID = str(ctx.guild.id)
         c = conn.cursor()
@@ -69,9 +69,6 @@ class BirthComs(commands.Cog):
             c.execute(f"CREATE TABLE \"{guildID}\" (nameID integer UNIQUE, birthmonth integer, birthday integer)") #IF NOT EXISTS
             conn.commit()
             await ctx.send("Guild registered.")
-            #If I'm not mistaken this makes a RegisteredGuilds with a guildID.
-            #If that works, it makes a new table with guildID as the name.
-            #The idea is to have a table hold the names and bdays for each user in a guild, and a table hold all guildIDs and cIDs
         except:
             await ctx.send("Guild already registered.")            
         c.close()
@@ -79,7 +76,7 @@ class BirthComs(commands.Cog):
     @commands.command()
     async def setAnnounceChannel(self, ctx, *, channel: discord.TextChannel):
         """Set the log channel to the id provided."""
-        #Set channel for logs
+        #Set channel for logs, or really the birthday announcement channel
         c = conn.cursor()
         try:
             c.execute("UPDATE RegisteredGuilds SET channelID = ? WHERE guildID = ?", (channel.id, ctx.guild.id))
@@ -115,7 +112,7 @@ class BirthComs(commands.Cog):
     
     @commands.command()
     async def updateBirthday(self, ctx, user: discord.User, monthstr, daystr):
-        """Enable deleted message logging"""
+        """Update a user's birthday."""
         #update user bday if it exists
         guildID = str(ctx.guild.id)
         month = int(monthstr)
@@ -130,7 +127,7 @@ class BirthComs(commands.Cog):
                 conn.commit()
                 await ctx.send(f"User updated with birthday {month}/{day}")
             except:
-                await ctx.send("Error. Not sure what the error was.")
+                await ctx.send("Error. Not sure what the error was, but there was one.")
             c.close()
         else:
             await ctx.send("Error. Did you tag a user and then follow with the month and day?")
@@ -153,57 +150,34 @@ class BirthComs(commands.Cog):
             
     @tasks.loop(time=time)
     async def my_task(self):
+
+
+        #runs at 7am UTC every day and tags everyone if there is a birthday
         c = conn.cursor()
-        run1 = 0
-        while run1 != 1:
-            try:
-                regGuilds = [registered[0] for registered in c.execute("SELECT guildID FROM RegisteredGuilds")]
-                
-                print (regGuilds)
-                print (type(regGuilds))
-                
-                for x in regGuilds:
-                    '''iterate through value 0-max
-                    if month = current month and day = current day
-                        post happy birthday message in regGuilds guildID channel'''        
-                    c.execute(f"SELECT * from \"{regGuilds[x]}\"")
-                    records = c.fetchall()
-                    print(type(records))
-                    print(records)
-                    for row in records:
-                        if row[1] == datetime.date.month and row[2] == datetime.date.day:
-                            print(f" {row[0]} gay")
-                        else:
-                            print(f" {row[0]} not gay")
-            except:
-                run1 = 1
-                print()
-        
+        regGuilds = [registered[0] for registered in c.execute("SELECT guildID FROM RegisteredGuilds")]
+        for x in regGuilds:
+            currGuildID = x
+            c.execute(f"SELECT * from \"{currGuildID}\"")
+            records = c.fetchall()
+            today = date.today()
+            for row in records:
+                if row[1] == today.month and row[2] == today.day:
+                    c.execute(f"SELECT channelID FROM RegisteredGuilds WHERE guildID = \"{currGuildID}\"")
+                    cID = c.fetchone()[0]
+                    channel = bot.get_channel(cID)
+                    await channel.send(f"@everyone Today is <@{row[0]}>'s birthday! Everyone wish them a happy birthday!!")
+       
 
         
 TOKEN = ""
 
 description = '''Testing ground for birthdalvis'''
 intents = discord.Intents.all()
-bot = commands.Bot(command_prefix='!', activity = discord.Game(name="v0.3 - daily checks"), description=description, intents= intents)
+bot = commands.Bot(command_prefix='!', activity = discord.Game(name="v0.4 - IT'S ALIVE"), description=description, intents= intents)
 
 @bot.event
 async def on_ready():
-    makeDatabase()
-    
-    c = conn.cursor()
-    c.execute(f"SELECT * from \"{insertguildidthisisfortestinganyways}\"")
-    records = c.fetchall()
-    print(type(records))
-    print(records)
-    today = date.today()
-    for row in records:
-        if row[1] == today.month and row[2] == today.day:
-            print(f" {row[0]} togay")
-        else:
-            print(f" {row[0]} not today")
-            
-                            
+    makeDatabase()             
     print('Logged in as')
     print(bot.user.name)
     print(bot.user.id)
